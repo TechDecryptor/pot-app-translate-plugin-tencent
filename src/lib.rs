@@ -94,6 +94,7 @@ pub fn translate(
     text: &str,
     from: &str,
     to: &str,
+    _detect: &str,
     _needs: HashMap<String, String>,
 ) -> Result<Value, Box<dyn Error>> {
     let client = reqwest::blocking::ClientBuilder::new().build()?;
@@ -157,7 +158,7 @@ mod tests {
     #[test]
     fn try_request() {
         let needs = HashMap::new();
-        let result = translate("Hello", "auto", "zh", needs).unwrap();
+        let result = translate("Hello", "auto", "zh", "", needs).unwrap();
         println!("{result}");
     }
 }
