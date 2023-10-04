@@ -22,13 +22,17 @@ pub fn translate(
         // .join("translate")
         // .join("[plugin].com.TechDecryptor.tencent")
         .join("cookie.json");
-    match cookie_file_path.exists() {
+    let cookie_file = match cookie_file_path.exists() {
         true => std::fs::File::open(&cookie_file_path)?,
         false => {
             std::fs::File::create(&cookie_file_path)?
             // std::fs::File::open(&cookie_file_path)?
         }
     };
+    let metedata = cookie_file.metadata()?;
+    let modified = metedata.modified()?;
+    let modified = modified.elapsed()?.as_secs();
+    println!("{:?}", modified);
     let file_content = std::fs::read_to_string(&cookie_file_path)?;
     let mut guid = String::new();
     let mut qtv = String::new();
@@ -62,9 +66,8 @@ pub fn translate(
             .unwrap()
             .to_string();
     }
-
-    // let guid = Uuid::new_v4().to_string();
-    let mut auth_req = client
+    if modified > 30 || qtv.is_empty() {
+        let mut auth_req = client
         .post("https://fanyi.qq.com/api/reauth12f")
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
         .header("Accept", "application/json, text/javascript, */*; q=0.01")
@@ -84,30 +87,33 @@ pub fn translate(
         .header("sec-ch-ua-platform", "\"Windows\"")
         .header("sec-gpc", "1")
         .header("Cache-Control", "no-cache");
-    if !qtv.is_empty() && !qtk.is_empty() {
-        let mut params = HashMap::new();
-        params.insert("qtv", &qtv);
-        params.insert("qtk", &qtk);
-        auth_req = auth_req
-            .header("Cookie", format!("fy_guid={guid}; qtv={qtv}; qtk={qtk}"))
-            .form(&params);
-    } else {
-        auth_req = auth_req.header("Cookie", format!("fy_guid={guid}"));
+        if !qtv.is_empty() && !qtk.is_empty() {
+            let mut params = HashMap::new();
+            params.insert("qtv", &qtv);
+            params.insert("qtk", &qtk);
+            auth_req = auth_req
+                .header("Cookie", format!("fy_guid={guid}; qtv={qtv}; qtk={qtk}"))
+                .form(&params);
+        } else {
+            auth_req = auth_req.header("Cookie", format!("fy_guid={guid}"));
+        }
+        let auth_res = auth_req.send()?.json()?;
+        fn parse_auth(res: Value) -> Option<(String, String)> {
+            let qtv = res.as_object()?.get("qtv")?.as_str()?.to_string();
+            let qtk = res.as_object()?.get("qtk")?.as_str()?.to_string();
+            Some((qtv, qtk))
+        }
+        (qtv, qtk) = match parse_auth(auth_res) {
+            Some(v) => v,
+            None => return Err("Auth Parse Error".into()),
+        };
+        std::fs::write(
+            cookie_file_path,
+            json!({"guid": guid, "qtv": qtv, "qtk": qtk}).to_string(),
+        )?;
+        println!("Auth Success");
     }
-    let auth_res = auth_req.send()?.json()?;
-    fn parse_auth(res: Value) -> Option<(String, String)> {
-        let qtv = res.as_object()?.get("qtv")?.as_str()?.to_string();
-        let qtk = res.as_object()?.get("qtk")?.as_str()?.to_string();
-        Some((qtv, qtk))
-    }
-    let (qtv, qtk) = match parse_auth(auth_res) {
-        Some(v) => v,
-        None => return Err("Auth Parse Error".into()),
-    };
-    std::fs::write(
-        cookie_file_path,
-        json!({"guid": guid, "qtv": qtv, "qtk": qtk}).to_string(),
-    )?;
+
     let dt = Utc::now();
     let time = dt.timestamp_millis();
     let translate_id = format!("translate_uuid{time}");
