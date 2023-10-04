@@ -17,22 +17,19 @@ pub fn translate(
     let client = reqwest::blocking::ClientBuilder::new().build()?;
     let config_dir_path = config_dir().unwrap();
     let cookie_file_path = config_dir_path
-        // .join("com.pot-app.desktop")
-        // .join("plugins")
-        // .join("translate")
-        // .join("[plugin].com.TechDecryptor.tencent")
+        .join("com.pot-app.desktop")
+        .join("plugins")
+        .join("translate")
+        .join("[plugin].com.TechDecryptor.tencent")
         .join("cookie.json");
     let cookie_file = match cookie_file_path.exists() {
         true => std::fs::File::open(&cookie_file_path)?,
-        false => {
-            std::fs::File::create(&cookie_file_path)?
-            // std::fs::File::open(&cookie_file_path)?
-        }
+        false => std::fs::File::create(&cookie_file_path)?
     };
     let metedata = cookie_file.metadata()?;
     let modified = metedata.modified()?;
     let modified = modified.elapsed()?.as_secs();
-    println!("{:?}", modified);
+
     let file_content = std::fs::read_to_string(&cookie_file_path)?;
     let mut guid = String::new();
     let mut qtv = String::new();
@@ -111,7 +108,6 @@ pub fn translate(
             cookie_file_path,
             json!({"guid": guid, "qtv": qtv, "qtk": qtk}).to_string(),
         )?;
-        println!("Auth Success");
     }
 
     let dt = Utc::now();
