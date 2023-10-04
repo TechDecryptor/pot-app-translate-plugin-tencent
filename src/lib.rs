@@ -1,6 +1,7 @@
 use chrono::prelude::*;
+use dirs::config_dir;
 use reqwest::header::{self, HeaderMap, HeaderName, HeaderValue};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::error::Error;
 use uuid::Uuid;
@@ -14,9 +15,56 @@ pub fn translate(
     _needs: HashMap<String, String>,
 ) -> Result<Value, Box<dyn Error>> {
     let client = reqwest::blocking::ClientBuilder::new().build()?;
+    let config_dir_path = config_dir().unwrap();
+    let cookie_file_path = config_dir_path
+        // .join("com.pot-app.desktop")
+        // .join("plugins")
+        // .join("translate")
+        // .join("[plugin].com.TechDecryptor.tencent")
+        .join("cookie.json");
+    match cookie_file_path.exists() {
+        true => std::fs::File::open(&cookie_file_path)?,
+        false => {
+            std::fs::File::create(&cookie_file_path)?
+            // std::fs::File::open(&cookie_file_path)?
+        }
+    };
+    let file_content = std::fs::read_to_string(&cookie_file_path)?;
+    let mut guid = String::new();
+    let mut qtv = String::new();
+    let mut qtk = String::new();
+    if file_content.is_empty() {
+        guid = Uuid::new_v4().to_string();
+    } else {
+        let cookie: Value = serde_json::from_str(&file_content)?;
+        guid = cookie
+            .as_object()
+            .unwrap()
+            .get("guid")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        qtv = cookie
+            .as_object()
+            .unwrap()
+            .get("qtv")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        qtk = cookie
+            .as_object()
+            .unwrap()
+            .get("qtk")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+    }
 
-    let guid = Uuid::new_v4().to_string();
-    let auth_res:Value = client
+    // let guid = Uuid::new_v4().to_string();
+    let mut auth_req = client
         .post("https://fanyi.qq.com/api/reauth12f")
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
         .header("Accept", "application/json, text/javascript, */*; q=0.01")
@@ -35,23 +83,33 @@ pub fn translate(
         .header("sec-ch-ua-mobile", "?0")
         .header("sec-ch-ua-platform", "\"Windows\"")
         .header("sec-gpc", "1")
-        .header("Cookie", format!("fy_guid={guid}"))
-        .header("Cache-Control", "no-cache")
-        .send()?
-        .json()?;
+        .header("Cache-Control", "no-cache");
+    if !qtv.is_empty() && !qtk.is_empty() {
+        let mut params = HashMap::new();
+        params.insert("qtv", &qtv);
+        params.insert("qtk", &qtk);
+        auth_req = auth_req
+            .header("Cookie", format!("fy_guid={guid}; qtv={qtv}; qtk={qtk}"))
+            .form(&params);
+    } else {
+        auth_req = auth_req.header("Cookie", format!("fy_guid={guid}"));
+    }
+    let auth_res = auth_req.send()?.json()?;
     fn parse_auth(res: Value) -> Option<(String, String)> {
         let qtv = res.as_object()?.get("qtv")?.as_str()?.to_string();
         let qtk = res.as_object()?.get("qtk")?.as_str()?.to_string();
-
         Some((qtv, qtk))
     }
     let (qtv, qtk) = match parse_auth(auth_res) {
         Some(v) => v,
         None => return Err("Auth Parse Error".into()),
     };
+    std::fs::write(
+        cookie_file_path,
+        json!({"guid": guid, "qtv": qtv, "qtk": qtk}).to_string(),
+    )?;
     let dt = Utc::now();
     let time = dt.timestamp_millis();
-
     let translate_id = format!("translate_uuid{time}");
     let mut body = HashMap::new();
     body.insert("source", from);
@@ -62,7 +120,6 @@ pub fn translate(
     body.insert("ticket", "");
     body.insert("randstr", "");
     body.insert("sessionUuid", &translate_id);
-
     let res = client
         .post("https://fanyi.qq.com/api/translate")
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
@@ -81,7 +138,9 @@ pub fn translate(
         .header("sec-ch-ua-platform", "\"Windows\"")
         .header("sec-gpc", "1")
         .header("Cookie", format!("fy_guid={guid}; qtv={qtv}; qtk={qtk}"))
-        .form(&body).send()?.json()?;
+        .form(&body)
+        .send()?
+        .json()?;
 
     fn parse_result(res: Value) -> Option<String> {
         let mut target = String::new();
