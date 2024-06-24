@@ -1,32 +1,32 @@
 async function translate(text, from, to, options) {
     const { utils, detect } = options;
     const { tauriFetch: fetch } = utils;
-    
-    if (from==="auto") {
+
+    if (from === "auto") {
         let langMap = {
-            "zh_cn" : "zh",
-            "zh_tw" : "zh-TW",
-            "en" : "en",
-            "ja" : "ja",
-            "ko" : "ko",
-            "fr" : "fr",
-            "es" : "es",
-            "ru" : "ru",
-            "de" : "de",
-            "it" : "it",
-            "tr" : "tr",
-            "pt_pt" : "pt",
-            "pt_br" : "pt",
-            "vi" : "vi",
-            "id" : "id",
-            "th" : "th",
-            "ms" : "ms",
-            "ar" : "ar",
-            "hi" : "hi"
+            "zh_cn": "zh",
+            "zh_tw": "zh-TW",
+            "en": "en",
+            "ja": "ja",
+            "ko": "ko",
+            "fr": "fr",
+            "es": "es",
+            "ru": "ru",
+            "de": "de",
+            "it": "it",
+            "tr": "tr",
+            "pt_pt": "pt",
+            "pt_br": "pt",
+            "vi": "vi",
+            "id": "id",
+            "th": "th",
+            "ms": "ms",
+            "ar": "ar",
+            "hi": "hi"
         };
-        if (langMap.includes(detect)) {
-            from=langMap[detect];
-        }else{
+        if (langMap[detect]) {
+            from = langMap[detect];
+        } else {
             from = "en"
         }
     }
@@ -39,12 +39,12 @@ async function translate(text, from, to, options) {
             "Referer": "https://servicewechat.com/wxb1070eabc6f9107e/117/page-frame.html"
         },
         query: {
-            "source":"auto",
-            "target":"auto",
-            "sourceText":text,
-            "platform":"WeChat_APP",
-            "guid":"oqdgX0SIwhvM0TmqzTHghWBvfk22",
-            "candidateLangs":`${from}|${to}`
+            "source": "auto",
+            "target": "auto",
+            "sourceText": text,
+            "platform": "WeChat_APP",
+            "guid": "oqdgX0SIwhvM0TmqzTHghWBvfk22",
+            "candidateLangs": `${from}|${to}`
         }
     });
 
