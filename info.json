@@ -1,5 +1,5 @@
 {
-  "id": "[plugin].com.TechDecryptor.tencent",
+  "id": "plugin.com.TechDecryptor.tencent",
   "plugin_type": "translate",
   "icon": "tencent.webp",
   "display": "腾讯翻译君",
